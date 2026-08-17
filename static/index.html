@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>雀魂牌谱本地复盘系统</title>
+<!-- majiang-ui 资源（阶段一就位，阶段四联调回放） -->
+<link rel="stylesheet" href="/static/majiang-ui/dist/css/majiang.css">
+<style>
+    :root {
+        --bg: #1c2333;
+        --panel: #262f47;
+        --border: #3a4564;
+        --text: #e8ecf5;
+        --muted: #8b94ad;
+        --accent: #5b8cff;
+        --ok: #3ecf8e;
+        --err: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+    }
+    header {
+        padding: 18px 28px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+    }
+    header h1 { margin: 0; font-size: 20px; }
+    header .badge {
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 2px 10px;
+    }
+    main { max-width: 960px; margin: 32px auto; padding: 0 24px; }
+    .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 22px 24px;
+        margin-bottom: 20px;
+    }
+    .card h2 { margin: 0 0 14px; font-size: 16px; color: var(--muted); font-weight: 600; }
+    .input-row { display: flex; gap: 10px; }
+    #paipu-url {
+        flex: 1;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 14px;
+        outline: none;
+    }
+    #paipu-url:focus { border-color: var(--accent); }
+    #btn-parse {
+        padding: 10px 22px;
+        border: none;
+        border-radius: 8px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 14px;
+        cursor: pointer;
+    }
+    #btn-parse:disabled { opacity: .5; cursor: wait; }
+    .hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+    .result { display: none; margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 14px; font-size: 13px; }
+    .result.ok .row { color: var(--ok); }
+    .result.err .row { color: var(--err); }
+    .result .row { margin: 4px 0; word-break: break-all; }
+    .result .row b { color: var(--muted); font-weight: 600; margin-right: 6px; }
+    #replay-area {
+        margin-top: 8px;
+        min-height: 220px;
+        border: 1px dashed var(--border);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 13px;
+    }
+    footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>🀄 雀魂牌谱本地复盘系统</h1>
+    <span class="badge">阶段一 · 基础环境</span>
+</header>
+
+<main>
+    <section class="card">
+        <h2>输入雀魂牌谱链接</h2>
+        <div class="input-row">
+            <input id="paipu-url" type="text"
+                   placeholder="https://game.maj-soul.com/1/?paipu=200515-cfbe0120-c92c-44ad-bdfc-ebfef3a33a10_a89702544"
+                   autocomplete="off">
+            <button id="btn-parse">解析</button>
+        </div>
+        <div class="hint">支持普通牌谱与匿名牌谱链接（_a 主视角 / _2 匿名后缀）。</div>
+        <div id="parse-result" class="result"></div>
+    </section>
+
+    <section class="card">
+        <h2>对局回放</h2>
+        <div id="replay-area">
+            majiang-ui 回放区 · 阶段四接入（当前阶段仅完成资源就位与链接解析）
+        </div>
+    </section>
+</main>
+
+<footer>仅本地运行 · 单条手动解析 · 请求间隔 ≥2s</footer>
+
+<script src="/static/majiang-ui/dist/majiang-ui.js"></script>
+<script>
+"use strict";
+
+const input = document.getElementById("paipu-url");
+const btn   = document.getElementById("btn-parse");
+const box   = document.getElementById("parse-result");
+
+function showResult(ok, lines) {
+    box.className = "result " + (ok ? "ok" : "err");
+    box.style.display = "block";
+    box.innerHTML = lines.map(l => `<div class="row"><b>${l[0]}</b>${l[1]}</div>`).join("");
+}
+
+btn.addEventListener("click", async () => {
+    const url = input.value.trim();
+    if (!url) { showResult(false, [["提示", "请先粘贴雀魂牌谱链接"]]); return; }
+    btn.disabled = true;
+    try {
+        const res = await fetch("/api/v1/paipu/parse", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            showResult(false, [["错误", data.detail || "解析失败"]]);
+            return;
+        }
+        showResult(true, [
+            ["对局 ID", data.uuid],
+            ["主视角", data.match_id || "（默认）"],
+            ["类型", data.anonymous ? "匿名牌谱" : "普通牌谱"],
+            ["对局日期", data.date || "（匿名链接无法识别）"],
+        ]);
+        if (window.Majiang && window.Majiang.UI) {
+            console.log("majiang-ui 已加载:", Object.keys(window.Majiang.UI).join(", "));
+        }
+    } catch (e) {
+        showResult(false, [["错误", String(e)]]);
+    } finally {
+        btn.disabled = false;
+    }
+});
+
+input.addEventListener("keydown", e => { if (e.key === "Enter") btn.click(); });
+</script>
+</body>
+</html>

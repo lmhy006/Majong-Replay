@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# 环境变量
+.env
+
+# Node / 前端构建
+node_modules/
+static/majiang-ui/node_modules/
+static/majiang-ui/dist/majiang-ui.js
+static/majiang-ui/dist/css/
+
+# AI 权重（不入库，单独提供）
+weights/
+
+# 测试与运行缓存
+.pytest_cache/
+.mypy_cache/
+*.log

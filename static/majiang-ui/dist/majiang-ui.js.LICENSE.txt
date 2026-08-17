@@ -1,0 +1,87 @@
+/*!
+ *  @kobalab/majiang-ai v1.2.0
+ *
+ *  Copyright(C) 2021 Satoshi Kobayashi
+ *  Released under the MIT license
+ *  https://github.com/kobalab/majiang-ai/blob/master/LICENSE
+ */
+
+/*!
+ *  @kobalab/majiang-core v1.4.1
+ *
+ *  Copyright(C) 2021 Satoshi Kobayashi
+ *  Released under the MIT license
+ *  https://github.com/kobalab/majiang-core/blob/master/LICENSE
+ */
+
+/*!
+ *  @kobalab/majiang-ui v1.6.0
+ *
+ *  Copyright(C) 2021 Satoshi Kobayashi
+ *  Released under the MIT license
+ *  https://github.com/kobalab/majiang-ui/blob/master/LICENSE
+ */
+
+/*!
+ *  @kobalab/tenhou-url-log v1.0.4
+ *
+ *  Copyright(C) 2024 Satoshi Kobayashi
+ *  Released under the MIT license
+ *  https://github.com/kobalab/tenhou-url-log/blob/master/LICENSE
+ */
+
+/*!
+ * jQuery JavaScript Library v3.7.1
+ * https://jquery.com/
+ *
+ * Copyright OpenJS Foundation and other contributors
+ * Released under the MIT license
+ * https://jquery.org/license
+ *
+ * Date: 2023-08-28T13:37Z
+ */
+
+/*!
+ * jQuery UI :data 1.14.2
+ * https://jqueryui.com
+ *
+ * Copyright OpenJS Foundation and other contributors
+ * Released under the MIT license.
+ * https://jquery.org/license
+ */
+
+/*!
+ * jQuery UI Mouse 1.14.2
+ * https://jqueryui.com
+ *
+ * Copyright OpenJS Foundation and other contributors
+ * Released under the MIT license.
+ * https://jquery.org/license
+ */
+
+/*!
+ * jQuery UI Scroll Parent 1.14.2
+ * https://jqueryui.com
+ *
+ * Copyright OpenJS Foundation and other contributors
+ * Released under the MIT license.
+ * https://jquery.org/license
+ */
+
+/*!
+ * jQuery UI Sortable 1.14.2
+ * https://jqueryui.com
+ *
+ * Copyright OpenJS Foundation and other contributors
+ * Released under the MIT license.
+ * https://jquery.org/license
+ */
+
+/*!
+ * jQuery UI Widget 1.14.2
+ * https://jqueryui.com
+ *
+ * Copyright OpenJS Foundation and other contributors
+ * Released under the MIT license.
+ * https://jquery.org/license
+ */

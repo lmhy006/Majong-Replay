@@ -1,0 +1,27 @@
+# 项目最低Python版本：3.10 ~ 3.12
+# 前端majiang-ui为JS组件，需单独npm管理，不在Python依赖内
+
+# ===================== 核心 Web 服务框架 =====================
+fastapi>=0.104.0,<0.120.0          # 后端接口服务
+uvicorn[standard]>=0.24.0,<0.30.0   # ASGI运行时，自带日志、静态文件支持
+watchfiles>=0.21.0,<1.0.0          # 【开发可选】代码热重载，开发环境推荐安装
+
+# ===================== 网络通信模块（雀魂牌谱拉取） =====================
+websockets>=12.0,<14.0
+
+# ===================== 数据解码 + 配置建模 =====================
+protobuf>=4.25.0,<5.0.0            # 解析雀魂liqi.proto二进制牌谱
+pydantic>=2.4.0,<3.0.0              # 对局状态结构化校验
+pydantic-settings>=2.1.0,<3.0.0    # 读取环境变量配置文件
+python-multipart>=0.0.6,<1.0.0      # 前端表单提交解析
+
+# ===================== 通用工具库 =====================
+numpy>=1.26.0,<3.0.0               # AI推理数值计算
+python-dotenv>=1.0.0,<2.0.0         # 本地.env环境文件加载
+
+# ===================== AI推理模块（仅推理，无训练） =====================
+# 安装说明：
+# 1. 无NVIDIA显卡/仅CPU：直接 pip install -r requirements.txt
+# 2. NVIDIA GPU CUDA118：pip install "torch>=2.1.0,<3.0.0" --index-url https://download.pytorch.org/whl/cu118
+# 3. NVIDIA GPU CUDA121：pip install "torch>=2.1.0,<3.0.0" --index-url https://download.pytorch.org/whl/cu121
+torch>=2.1.0,<3.0.0
