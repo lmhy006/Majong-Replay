@@ -16,6 +16,7 @@
         --accent: #5b8cff;
         --ok: #3ecf8e;
         --err: #ff6b6b;
+        --warn: #ffb454;
     }
     * { box-sizing: border-box; }
     body {
@@ -41,7 +42,7 @@
         border-radius: 999px;
         padding: 2px 10px;
     }
-    main { max-width: 960px; margin: 32px auto; padding: 0 24px; }
+    main { max-width: 1080px; margin: 32px auto; padding: 0 24px; }
     .card {
         background: var(--panel);
         border: 1px solid var(--border);
@@ -50,9 +51,9 @@
         margin-bottom: 20px;
     }
     .card h2 { margin: 0 0 14px; font-size: 16px; color: var(--muted); font-weight: 600; }
-    .input-row { display: flex; gap: 10px; }
+    .input-row { display: flex; gap: 10px; flex-wrap: wrap; }
     #paipu-url {
-        flex: 1;
+        flex: 1 1 360px;
         padding: 10px 14px;
         border-radius: 8px;
         border: 1px solid var(--border);
@@ -60,24 +61,48 @@
         color: var(--text);
         font-size: 14px;
         outline: none;
+        min-width: 260px;
     }
     #paipu-url:focus { border-color: var(--accent); }
-    #btn-parse {
-        padding: 10px 22px;
+    button {
+        padding: 10px 18px;
         border: none;
         border-radius: 8px;
-        background: var(--accent);
-        color: #fff;
         font-size: 14px;
         cursor: pointer;
+        color: #fff;
+        background: var(--accent);
     }
-    #btn-parse:disabled { opacity: .5; cursor: wait; }
-    .hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+    button.secondary { background: #3d4a6b; }
+    button:disabled { opacity: .5; cursor: wait; }
+    .hint { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.7; }
     .result { display: none; margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 14px; font-size: 13px; }
     .result.ok .row { color: var(--ok); }
     .result.err .row { color: var(--err); }
     .result .row { margin: 4px 0; word-break: break-all; }
     .result .row b { color: var(--muted); font-weight: 600; margin-right: 6px; }
+    #events-summary { margin-top: 14px; font-size: 13px; color: var(--muted); }
+    #events-table { display: none; margin-top: 10px; width: 100%; border-collapse: collapse; font-size: 13px; }
+    #events-table th, #events-table td {
+        padding: 7px 10px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+    }
+    #events-table th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+    #events-table td.step { color: var(--muted); width: 48px; }
+    #events-table td.seat { white-space: nowrap; }
+    #events-table td.detail { color: #c6cde0; word-break: break-all; }
+    .tag {
+        display: inline-block;
+        font-size: 12px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        white-space: nowrap;
+    }
+    .tag-pos { color: var(--ok); background: rgba(62,207,142,.12); }
+    .tag-err { color: var(--err); background: rgba(255,107,107,.12); }
+    .tag-warn { color: var(--warn); background: rgba(255,180,84,.12); }
     #replay-area {
         margin-top: 8px;
         min-height: 220px;
@@ -96,26 +121,45 @@
 
 <header>
     <h1>🀄 雀魂牌谱本地复盘系统</h1>
-    <span class="badge">阶段一 · 基础环境</span>
+    <span class="badge">阶段二 · 牌谱拉取与解码</span>
 </header>
 
 <main>
     <section class="card">
         <h2>输入雀魂牌谱链接</h2>
         <div class="input-row">
+            <button id="btn-launch-browser" class="secondary">① 启动调试浏览器</button>
             <input id="paipu-url" type="text"
                    placeholder="https://game.maj-soul.com/1/?paipu=200515-cfbe0120-c92c-44ad-bdfc-ebfef3a33a10_a89702544"
                    autocomplete="off">
+            <button id="btn-browser-fetch">② 浏览器拉取</button>
             <button id="btn-parse">解析</button>
+            <button id="btn-demo" class="secondary">查看内置示例</button>
         </div>
-        <div class="hint">支持普通牌谱与匿名牌谱链接（_a 主视角 / _2 匿名后缀）。</div>
+        <div class="hint">
+            支持普通牌谱与匿名牌谱链接（_a 主视角 / _2 匿名后缀）。<br>
+            首次使用：先点「① 启动调试浏览器」并在打开的浏览器中登录雀魂（只需一次）；
+            之后粘贴牌谱链接 → 点「② 浏览器拉取」→ 拉取成功后浏览器自动关闭。<br>
+            「解析」仅提取对局 ID；「内置示例」无需任何登录，直接演示解码链路。
+        </div>
         <div id="parse-result" class="result"></div>
+    </section>
+
+    <section class="card">
+        <h2>对局行为（事件流解码）</h2>
+        <div id="events-summary">尚未拉取。</div>
+        <table id="events-table">
+            <thead>
+                <tr><th>#</th><th>行为</th><th>座位</th><th>详情</th></tr>
+            </thead>
+            <tbody id="events-body"></tbody>
+        </table>
     </section>
 
     <section class="card">
         <h2>对局回放</h2>
         <div id="replay-area">
-            majiang-ui 回放区 · 阶段四接入（当前阶段仅完成资源就位与链接解析）
+            majiang-ui 回放区 · 阶段四接入（当前阶段完成事件流解码）
         </div>
     </section>
 </main>
@@ -126,9 +170,74 @@
 <script>
 "use strict";
 
-const input = document.getElementById("paipu-url");
-const btn   = document.getElementById("btn-parse");
-const box   = document.getElementById("parse-result");
+const input  = document.getElementById("paipu-url");
+const btnLaunchBrowser = document.getElementById("btn-launch-browser");
+const btnParse = document.getElementById("btn-parse");
+const btnBrowserFetch = document.getElementById("btn-browser-fetch");
+const btnDemo  = document.getElementById("btn-demo");
+const box    = document.getElementById("parse-result");
+const evSummary = document.getElementById("events-summary");
+const evTable   = document.getElementById("events-table");
+const evBody    = document.getElementById("events-body");
+
+const SEAT_NAME = ["东", "南", "西", "北"];
+
+// ---- 事件详情渲染 ----
+
+function describeEvent(e) {
+    const d = e.data || {};
+    switch (e.type) {
+        case "new_round":
+            return `场${d.chang ?? 0} 局${d.ju ?? 0} 本场${d.ben ?? 0} · 宝牌指示 ${d.dora || "-"} · 剩余牌山 ${d.left_tile_count ?? "-"}`;
+        case "deal_tile":
+            return `摸牌 ${d.tile ?? "-"} · 剩余 ${d.left_tile_count ?? "-"}`;
+        case "discard_tile":
+            const liqi = d.is_liqi ? " 🎋立直" : (d.is_wliqi ? " 🎋双立直" : "");
+            return `打牌 ${d.tile ?? "-"}${liqi}`;
+        case "chi_peng_gang": {
+            const names = {0: "吃", 1: "碰", 2: "明杠", 3: "加杠"};
+            return `${names[d.type] ?? "鸣牌"} ${(d.tiles || []).join(" ")} 来自${(d.froms || []).join(",")}`;
+        }
+        case "an_gang_add_gang":
+            return `暗杠/加杠 ${d.tiles ?? "-"}`;
+        case "ba_bei":
+            return `拔北`;
+        case "gang_result":
+            return `杠结果`;
+        case "hu": {
+            const hules = d.hules || [];
+            const parts = hules.map(h =>
+                `座位${SEAT_NAME[h.seat] ?? h.seat} ${h.zimo ? "自摸" : "荣和"} ${h.hu_tile || ""} 役${h.count ?? "-"}`
+            );
+            return parts.join("；") || "和牌";
+        }
+        case "liu_ju":
+            return `流局（type=${d.type ?? "-"}）`;
+        case "no_tile":
+            return `无牌可摸（流局）`;
+        default:
+            return JSON.stringify(d);
+    }
+}
+
+function renderEvents(res) {
+    evSummary.textContent = `对局 ${res.uuid} · 数据版本 ${res.version} · 共 ${res.event_count} 个事件`;
+    evBody.innerHTML = "";
+    for (const e of res.events) {
+        const tr = document.createElement("tr");
+        const seatText = e.seat != null ? SEAT_NAME[e.seat] ?? e.seat : "-";
+        const typeText = e.type.replace(/_/g, " ");
+        tr.innerHTML =
+            `<td class="step">${e.step}</td>` +
+            `<td><span class="tag tag-pos">${typeText}</span></td>` +
+            `<td class="seat">${seatText}</td>` +
+            `<td class="detail">${describeEvent(e)}</td>`;
+        evBody.appendChild(tr);
+    }
+    evTable.style.display = "table";
+}
+
+// ---- 交互 ----
 
 function showResult(ok, lines) {
     box.className = "result " + (ok ? "ok" : "err");
@@ -136,18 +245,46 @@ function showResult(ok, lines) {
     box.innerHTML = lines.map(l => `<div class="row"><b>${l[0]}</b>${l[1]}</div>`).join("");
 }
 
-btn.addEventListener("click", async () => {
-    const url = input.value.trim();
-    if (!url) { showResult(false, [["提示", "请先粘贴雀魂牌谱链接"]]); return; }
-    btn.disabled = true;
+function setBusy(busy) {
+    btnLaunchBrowser.disabled = btnParse.disabled = btnBrowserFetch.disabled = btnDemo.disabled = busy;
+}
+
+async function postJSON(path, body) {
+    const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+    return { status: res.status, data: await res.json() };
+}
+
+btnLaunchBrowser.addEventListener("click", async () => {
+    btnLaunchBrowser.disabled = true;
     try {
-        const res = await fetch("/api/v1/paipu/parse", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url }),
-        });
+        const res = await fetch("/api/v1/browser/launch", { method: "POST" });
         const data = await res.json();
         if (!res.ok) {
+            showResult(false, [["失败", data.detail || "浏览器启动失败"]]);
+            return;
+        }
+        showResult(true, [
+            ["已启动", data.browser],
+            ["提示", "在打开的浏览器中登录雀魂（首次需登录一次），然后粘贴牌谱链接点「② 浏览器拉取」"],
+        ]);
+    } catch (e) {
+        showResult(false, [["错误", String(e)]]);
+    } finally {
+        btnLaunchBrowser.disabled = false;
+    }
+});
+
+btnParse.addEventListener("click", async () => {
+    const url = input.value.trim();
+    if (!url) { showResult(false, [["提示", "请先粘贴雀魂牌谱链接"]]); return; }
+    setBusy(true);
+    try {
+        const { status, data } = await postJSON("/api/v1/paipu/parse", { url });
+        if (status !== 200) {
             showResult(false, [["错误", data.detail || "解析失败"]]);
             return;
         }
@@ -157,17 +294,56 @@ btn.addEventListener("click", async () => {
             ["类型", data.anonymous ? "匿名牌谱" : "普通牌谱"],
             ["对局日期", data.date || "（匿名链接无法识别）"],
         ]);
-        if (window.Majiang && window.Majiang.UI) {
-            console.log("majiang-ui 已加载:", Object.keys(window.Majiang.UI).join(", "));
-        }
     } catch (e) {
         showResult(false, [["错误", String(e)]]);
     } finally {
-        btn.disabled = false;
+        setBusy(false);
     }
 });
 
-input.addEventListener("keydown", e => { if (e.key === "Enter") btn.click(); });
+btnBrowserFetch.addEventListener("click", async () => {
+    const url = input.value.trim();
+    if (!url) { showResult(false, [["提示", "请先粘贴雀魂牌谱链接"]]); return; }
+    setBusy(true);
+    showResult(true, [["进行中", "正在通过调试浏览器打开牌谱并捕获数据（Unity 加载约需 10-60s）…"]]);
+    try {
+        const { status, data } = await postJSON("/api/v1/paipu/browser-fetch", { url });
+        if (status !== 200) {
+            showResult(false, [["拉取失败", data.detail || "未知错误"]]);
+            evSummary.textContent = "拉取失败，无事件数据。";
+            return;
+        }
+        showResult(true, [
+            ["拉取成功", `对局 ${data.uuid}，解码出 ${data.event_count} 个事件`],
+            ["浏览器", "已自动关闭（下次拉取时点「① 启动调试浏览器」即可）"],
+        ]);
+        renderEvents(data);
+    } catch (e) {
+        showResult(false, [["错误", String(e)]]);
+    } finally {
+        setBusy(false);
+    }
+});
+
+btnDemo.addEventListener("click", async () => {
+    setBusy(true);
+    try {
+        const res = await fetch("/api/v1/paipu/demo");
+        const data = await res.json();
+        if (!res.ok) {
+            showResult(false, [["错误", data.detail || "演示数据加载失败"]]);
+            return;
+        }
+        showResult(true, [["演示", "内置真实牌谱样例（无需 token）"], ["事件数", String(data.event_count)]]);
+        renderEvents(data);
+    } catch (e) {
+        showResult(false, [["错误", String(e)]]);
+    } finally {
+        setBusy(false);
+    }
+});
+
+input.addEventListener("keydown", e => { if (e.key === "Enter") btnParse.click(); });
 </script>
 </body>
 </html>

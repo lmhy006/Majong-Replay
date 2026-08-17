@@ -21,3 +21,14 @@ weights/
 .pytest_cache/
 .mypy_cache/
 *.log
+
+# 牌谱数据（拉取产物不入库）
+_paipu.bin
+data/
+
+# 登录辅助：调试浏览器独立 profile（含登录态，勿入库）
+.browser-profile/
+.test_tmp_*/
+
+# 登录参数（random_key/device 等，与 token 配套，勿入库）
+majsoul_credentials.json

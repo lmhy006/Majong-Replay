@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
+        env_prefix="DSH_MAJONG_",  # 环境变量统一前缀：DSH_MAJONG_HOST 等
         extra="ignore",
     )
 
@@ -42,9 +43,11 @@ class Settings(BaseSettings):
     weights_dir: Path = BASE_DIR / "weights"
     majiang_ui_dir: Path = BASE_DIR / "static" / "majiang-ui"
 
-    # ---- 牌谱拉取（阶段二使用） ----
+    # ---- 牌谱拉取（阶段二） ----
     majsoul_host: str = "https://game.maj-soul.com"
     request_interval_seconds: float = 2.0  # 连续请求最小间隔，规避风控
+    # 雀魂 access_token（浏览器登录后从控制台获取，见 README）
+    majsoul_token: str = ""
 
 
 @lru_cache
