@@ -65,6 +65,19 @@ class PaipuFetchResponse(BaseModel):
     version: int                 # 牌谱数据版本
     events: list                 # 解码后的对局事件列表
     event_count: int             # 事件总数
+    snapshots: list = []         # 阶段三：每个事件后的完整对局快照列表
+
+
+class PaipuSimulateRequest(BaseModel):
+    events: list = Field(..., min_length=1, description="解码后的对局事件列表")
+    head: dict | None = Field(default=None, description="可选的对局头信息（uuid 等）")
+
+
+class PaipuSimulateResponse(BaseModel):
+    uuid: str = ""
+    event_count: int
+    snapshot_count: int
+    snapshots: list
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +127,14 @@ async def browser_fetch_paipu(req: PaipuFetchRequest):
     try:
         data = await capture_game_record(browser_url, port=9222)
         result = decode_paipu(data)
+        from game_state.game_simulator import simulate
+        from game_state.snapshot import save_snapshots
+
+        snapshots = simulate(result.events, head={"uuid": info.uuid})
+        try:
+            save_snapshots(info.uuid, snapshots, settings.record_cache_dir)
+        except Exception as exc:
+            logger.warning("保存快照缓存失败（不影响本次结果）: %s", exc)
     except CaptureRecordError as exc:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
     except Exception as exc:
@@ -132,6 +153,7 @@ async def browser_fetch_paipu(req: PaipuFetchRequest):
         version=result.version,
         events=[e.to_dict() for e in result.events],
         event_count=len(result.events),
+        snapshots=[s.model_dump(mode="json") for s in snapshots],
     )
 
 
@@ -160,11 +182,35 @@ def demo_paipu():
     res = pb.ResGameRecord()
     res.ParseFromString(raw)
     result = decode_paipu(res.data)
+    from game_state.game_simulator import simulate
+
+    snapshots = simulate(result.events, head={"uuid": res.head.uuid or "sample"}, strict=False)
     return PaipuFetchResponse(
         uuid=res.head.uuid or "sample",
         version=result.version,
         events=[e.to_dict() for e in result.events],
         event_count=len(result.events),
+        snapshots=[s.model_dump(mode="json") for s in snapshots],
+    )
+
+
+@app.post("/api/v1/paipu/simulate", response_model=PaipuSimulateResponse)
+def simulate_paipu(req: PaipuSimulateRequest):
+    """直接对已解码事件流做状态机重放，返回逐事件完整快照。"""
+    from game_state.game_simulator import simulate_from_dicts
+
+    try:
+        snapshots = simulate_from_dicts(req.events, head=req.head)
+    except Exception as exc:
+        logger.warning("simulate 失败: %s", exc)
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    uuid = (req.head or {}).get("uuid", "")
+    return PaipuSimulateResponse(
+        uuid=uuid,
+        event_count=len(req.events),
+        snapshot_count=len(snapshots),
+        snapshots=[s.model_dump(mode="json") for s in snapshots],
     )
 
 

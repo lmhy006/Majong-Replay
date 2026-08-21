@@ -32,3 +32,5 @@ data/
 
 # 登录参数（random_key/device 等，与 token 配套，勿入库）
 majsoul_credentials.json
+
+*.docx

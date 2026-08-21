@@ -26,6 +26,16 @@
 | 协议兼容与错误处理 | ✅ | 新旧协议版本兼容、151/1004 等错误码映射、频率限制 |
 | 单元测试 | ✅ | 66 个用例全通过（含真实牌谱 fixture） |
 
+### 阶段三（对局状态机）✅
+
+| 子任务 | 状态 | 说明 |
+| --- | --- | --- |
+| 状态模型 | ✅ | `game_state/state_model.py`：全局/玩家/立直/副露/快照模型 |
+| 事件推演 | ✅ | `game_state/game_simulator.py`：逐事件还原手牌、牌河、副露、点数、立直、多局切换 |
+| 快照生成与缓存 | ✅ | `game_state/snapshot.py`：每事件完整快照 + `data/game_records/` JSON 缓存 |
+| 接口接入 | ✅ | `browser-fetch` / `demo` 返回 `snapshots`；新增 `POST /api/v1/paipu/simulate` |
+| 单元测试 | ✅ | 新增 11 个状态机用例，总计 77 个用例全通过 |
+
 > **拉取方式说明**：雀魂自 2023 年起阻止程序化登录（错误码 151），
 > Python 直连登录不可用。当前主路径为**浏览器拉取**——通过本地调试浏览器
 > 打开牌谱链接，雀魂页面自动拉取，我们截获 WebSocket 响应帧并解码。
@@ -40,6 +50,10 @@ majong_replay/
 ├── url_parser.py           # 雀魂牌谱链接解析（阶段一）
 ├── majsoul_ws.py           # 雀魂 WebSocket 协议层（底层保留，备用）
 ├── token_helper.py         # 浏览器 CDP 捕获/关闭（浏览器拉取核心）
+├── game_state/             # 阶段三：对局状态机
+│   ├── state_model.py      # 状态模型（GameState/PlayerState/LiqiState/快照）
+│   ├── game_simulator.py   # 事件推演核心（逐事件还原对局）
+│   └── snapshot.py         # 快照生成 + JSON 缓存
 ├── proto/
 │   ├── protocol.proto      # 雀魂协议定义（967 消息）
 │   ├── protocol_pb2.py     # 编译产物
@@ -51,6 +65,7 @@ majong_replay/
 │   ├── test_decoder.py     # 9 用例（含真实牌谱 fixture）
 │   ├── test_majsoul_ws.py  # 8 用例（帧协议 / 错误映射）
 │   ├── test_token_helper.py# 23 用例（CDP 捕获 / 关闭 / 帧解析）
+│   ├── test_game_simulator.py # 11 用例（状态机推演）
 │   └── fixtures/           # 真实牌谱样例（MIT 许可）
 ├── static/
 │   ├── index.html          # 基础页面（浏览器拉取 / 解析 / 示例）
@@ -100,8 +115,9 @@ python .dev/demo_decode.py <文件路径>
 ### API
 
 * `POST /api/v1/paipu/parse` — 解析牌谱链接（无需登录）
-* `POST /api/v1/paipu/browser-fetch` — 浏览器拉取并解码（主路径，需调试浏览器已登录）
-* `GET  /api/v1/paipu/demo` — 内置示例解码（无需登录/网络）
+* `POST /api/v1/paipu/browser-fetch` — 浏览器拉取并解码（主路径，需调试浏览器已登录），返回 `events` + `snapshots`
+* `GET  /api/v1/paipu/demo` — 内置示例解码（无需登录/网络），返回 `events` + `snapshots`
+* `POST /api/v1/paipu/simulate` — 直接对事件流做状态机重放，返回逐事件完整快照
 
 ## 运行测试
 

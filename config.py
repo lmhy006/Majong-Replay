@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     static_dir: Path = BASE_DIR / "static"
     weights_dir: Path = BASE_DIR / "weights"
     majiang_ui_dir: Path = BASE_DIR / "static" / "majiang-ui"
+    record_cache_dir: Path = BASE_DIR / "data" / "game_records"  # 对局快照缓存目录（阶段三）
 
     # ---- 牌谱拉取（阶段二） ----
     majsoul_host: str = "https://game.maj-soul.com"
