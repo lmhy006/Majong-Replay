@@ -36,6 +36,30 @@
 | 接口接入 | ✅ | `browser-fetch` / `demo` 返回 `snapshots`；新增 `POST /api/v1/paipu/simulate` |
 | 单元测试 | ✅ | 新增 11 个状态机用例，总计 77 个用例全通过 |
 
+### 阶段四（majiang-ui 前端回放对接）✅
+
+| 子任务 | 状态 | 说明 |
+| --- | --- | --- |
+| majiang-ui 输入格式调研 | ✅ | 确认 `paipu` 对象结构与 `Board` 事件格式 |
+| 数据转换器 | ✅ | `replay/adapter.py`：事件流/快照 → majiang-ui paipu |
+| 回放数据接口 | ✅ | `GET /api/v1/paipu/{uuid}/replay` |
+| 前端回放接入 | ✅ | `static/index.html` 自动加载 majiang-ui 回放（步进/自动播放/巡目跳转） |
+| 真实牌谱验证 | ✅ | 6 份真实四麻牌谱通过 Node + majiang-core Board 完整回放 |
+| 单元测试 | ✅ | 新增适配器测试，当前总计 86 个用例全通过 |
+
+### 阶段五（AI 推理模块）✅
+
+| 子任务 | 状态 | 说明 |
+| --- | --- | --- |
+| Mortal 源码/权重接入 | ✅ | `Mortal/` 仓库 + `weights/mortal_298k.pth`（v4） |
+| 权重加载与引擎构建 | ✅ | `ai_module/mortal_model_adapter.py`：加载 Brain/DQN，构建 MortalEngine |
+| 雀魂事件 → mjai 转换 | ✅ | `ai_module/mjai_converter.py`：真实牌谱可被 libriichi PlayerState 完整消费 |
+| Mortal 推理 | ✅ | `ai_module/mortal_inference.py`：真实牌谱输出 76 个决策点 AI 推荐 |
+| obs 编码 | ✅ | 推理使用官方 libriichi 生成 `(1012,34)` obs；`obs_encoder.py` 为纯 Python 备用实现 |
+| 复盘对比/失误分析/报告 | ✅ | `ai_module/replay_analyzer.py`：实战动作对比、失误统计、summary |
+| API | ✅ | `GET /api/v1/paipu/{uuid}/ai` |
+| 单元测试 | ✅ | 当前总计 101 个用例全通过 |
+
 > **拉取方式说明**：雀魂自 2023 年起阻止程序化登录（错误码 151），
 > Python 直连登录不可用。当前主路径为**浏览器拉取**——通过本地调试浏览器
 > 打开牌谱链接，雀魂页面自动拉取，我们截获 WebSocket 响应帧并解码。
@@ -54,6 +78,14 @@ majong_replay/
 │   ├── state_model.py      # 状态模型（GameState/PlayerState/LiqiState/快照）
 │   ├── game_simulator.py   # 事件推演核心（逐事件还原对局）
 │   └── snapshot.py         # 快照生成 + JSON 缓存
+├── replay/                 # 阶段四：回放适配
+│   └── adapter.py          # 事件流/快照 → majiang-ui paipu 转换器
+├── ai_module/              # 阶段五：AI 推理
+│   ├── obs_encoder.py      # 局面编码（Mortal v4 形状对齐中）
+│   ├── mortal_model_adapter.py # 权重加载与 MortalEngine 构建
+│   ├── mjai_converter.py   # 雀魂事件 → mjai 事件
+│   ├── mortal_inference.py # 基于 libriichi 的推理器
+│   └── replay_analyzer.py  # 复盘分析器
 ├── proto/
 │   ├── protocol.proto      # 雀魂协议定义（967 消息）
 │   ├── protocol_pb2.py     # 编译产物
@@ -65,7 +97,8 @@ majong_replay/
 │   ├── test_decoder.py     # 9 用例（含真实牌谱 fixture）
 │   ├── test_majsoul_ws.py  # 8 用例（帧协议 / 错误映射）
 │   ├── test_token_helper.py# 23 用例（CDP 捕获 / 关闭 / 帧解析）
-│   ├── test_game_simulator.py # 11 用例（状态机推演）
+│   ├── test_game_simulator.py # 15 用例（状态机推演）
+│   ├── test_adapter.py     # 5 用例（majiang-ui 数据转换）
 │   └── fixtures/           # 真实牌谱样例（MIT 许可）
 ├── static/
 │   ├── index.html          # 基础页面（浏览器拉取 / 解析 / 示例）
@@ -118,6 +151,8 @@ python .dev/demo_decode.py <文件路径>
 * `POST /api/v1/paipu/browser-fetch` — 浏览器拉取并解码（主路径，需调试浏览器已登录），返回 `events` + `snapshots`
 * `GET  /api/v1/paipu/demo` — 内置示例解码（无需登录/网络），返回 `events` + `snapshots`
 * `POST /api/v1/paipu/simulate` — 直接对事件流做状态机重放，返回逐事件完整快照
+* `GET  /api/v1/paipu/{uuid}/replay` — 从快照缓存生成 majiang-ui 回放数据
+* `GET  /api/v1/paipu/{uuid}/ai` — 对已拉取牌谱运行 Mortal AI 推理，返回逐决策点推荐（需 .venv 环境）
 
 ## 运行测试
 
@@ -148,3 +183,5 @@ python -m unittest discover -s tests -v
 * 前端 UI：<https://github.com/kobalab/majiang-ui>（MIT）
 * 匿名 UUID 算法：<https://github.com/Fat-pig-Cui/misc-code>
 * 真实牌谱样例：<https://github.com/honvl/Majsoul-to-NAGA>（MIT）
+* Mortal AI 源码：<https://github.com/Equim-chan/Mortal>（AGPL-3.0）
+* 社区轻量化 Mortal 权重：<https://huggingface.co/VoidShine/mortal-298k>（AGPL-3.0，本地位于 `weights/mortal_298k.pth`）

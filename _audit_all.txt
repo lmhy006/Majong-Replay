@@ -1,0 +1,24 @@
+﻿�ļ�: C:\dsh_ws\majong_replay\data\game_records\260707-bb78d259-68be-4f15-94e0-11a6f3354a95.json
+������: 513
+��������: 0
+δ��������״̬��ƫ�
+�ļ�: C:\dsh_ws\majong_replay\data\game_records\260707-06b81a28-0903-4b92-b00c-aec88b3e93e9.json
+������: 513
+��������: 0
+δ��������״̬��ƫ�
+�ļ�: C:\dsh_ws\majong_replay\data\game_records\260326-654aff68-41e9-483d-9e41-84d1a3da3aeb.json
+������: 811
+��������: 0
+δ��������״̬��ƫ�
+�ļ�: C:\dsh_ws\majong_replay\data\game_records\260321-91a5db28-9bee-418b-9854-bfce879ac00d.json
+������: 461
+��������: 0
+δ��������״̬��ƫ�
+�ļ�: C:\dsh_ws\majong_replay\data\game_records\260321-7294963a-2b6e-477a-a178-e6e08f214704.json
+������: 566
+��������: 0
+δ��������״̬��ƫ�
+�ļ�: C:\dsh_ws\majong_replay\data\game_records\260321-30c366d1-a2ca-477a-b17c-bd4b6dac69d0.json
+������: 792
+��������: 0
+δ��������״̬��ƫ�

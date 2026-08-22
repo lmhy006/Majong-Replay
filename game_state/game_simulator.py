@@ -98,6 +98,8 @@ def _apply_new_round(state: GameState, event: GameEvent) -> None:
         for i in range(4)
     ]
     state.round_status = "playing"
+    state.liu_ju_type = 0
+    state.liu_ju_manguan = False
     # 整场状态不在这里重置：只有 hu/liu_ju 带 gameend 时才结束整场
 
 
@@ -307,6 +309,16 @@ def _apply_liu_ju(state: GameState, event: GameEvent) -> None:
     data = event.data
     state.round_status = "ended"
 
+    # 记录特殊流局类型：
+    #   liu_ju.type 区分九种九牌/四风连打/四家立直/四杠散了等（原始协议值）
+    #   no_tile.liujumanguan 表示流局满贯
+    if event.type == "liu_ju":
+        state.liu_ju_type = int(data.get("type", 0) or 0)
+        state.liu_ju_manguan = False
+    elif event.type == "no_tile":
+        state.liu_ju_type = 0
+        state.liu_ju_manguan = bool(data.get("liujumanguan", False))
+
     # 点数更新：RecordNoTile.scores[] / RecordLiuJu 相关字段
     scores_info = data.get("scores")
     if scores_info:
@@ -370,6 +382,8 @@ def make_snapshot(state: GameState, event: GameEvent) -> GameSnapshot:
         players=[p.model_copy(deep=True) for p in state.players],
         round_status=state.round_status,
         game_status=state.game_status,
+        liu_ju_type=state.liu_ju_type,
+        liu_ju_manguan=state.liu_ju_manguan,
     )
 
 

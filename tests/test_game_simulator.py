@@ -309,6 +309,36 @@ class TestGameSimulator(unittest.TestCase):
         # delta_scores [1000,1000,-1000,-1000] 叠加到第二局起始分数
         self.assertEqual(last.scores, [26000, 25000, 24000, 24000])
 
+    def test_special_liu_ju_recorded(self):
+        """liu_ju.type 与 no_tile.liujumanguan 应记录到快照，供特殊流局识别。"""
+        base = {
+            "chang": 0, "ju": 0, "ben": 0,
+            "scores": [25000] * 4,
+            "liqibang": 0,
+            "tiles0": ["A"] * 14,
+            "tiles1": ["B"] * 13,
+            "tiles2": ["C"] * 13,
+            "tiles3": ["D"] * 13,
+        }
+
+        # 特殊流局：liu_ju.type=1（九种九牌等，原始协议值）
+        events_liu = [
+            {"step": 1, "type": "new_round", "seat": None, "data": base},
+            {"step": 2, "type": "liu_ju", "seat": None, "data": {"type": 1, "gameend": False}},
+        ]
+        last = simulate_from_dicts(events_liu)[-1]
+        self.assertEqual(last.liu_ju_type, 1)
+        self.assertFalse(last.liu_ju_manguan)
+
+        # 流局满贯：no_tile.liujumanguan=True
+        events_manguan = [
+            {"step": 1, "type": "new_round", "seat": None, "data": base},
+            {"step": 2, "type": "no_tile", "seat": None, "data": {"liujumanguan": True, "gameend": False}},
+        ]
+        last2 = simulate_from_dicts(events_manguan)[-1]
+        self.assertEqual(last2.liu_ju_type, 0)
+        self.assertTrue(last2.liu_ju_manguan)
+
     def test_snapshot_json_roundtrip(self):
         data = snapshots_to_dict(self.snapshots)
         self.assertEqual(data["snapshot_count"], len(self.snapshots))

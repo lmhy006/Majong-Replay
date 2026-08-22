@@ -77,6 +77,9 @@ class GameState(BaseModel):
     )
     round_status: str = "playing"   # playing | ended
     game_status: str = "playing"    # playing | ended
+    # 特殊流局标记：liu_ju.type 原始值 + no_tile.liujumanguan 流局满贯
+    liu_ju_type: int = 0
+    liu_ju_manguan: bool = False
     # 内部开关：严格模式下手牌/牌河不一致直接抛错；非严格模式跳过并继续
     strict: bool = True
 
@@ -99,3 +102,5 @@ class GameSnapshot(BaseModel):
     players: List[PlayerState] = Field(default_factory=list)
     round_status: str = "playing"
     game_status: str = "playing"
+    liu_ju_type: int = 0
+    liu_ju_manguan: bool = False

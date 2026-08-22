@@ -6,6 +6,8 @@
     * POST /api/v1/paipu/parse        牌谱链接解析
     * POST /api/v1/paipu/browser-fetch 浏览器拉取并解码（主路径）
     * GET  /api/v1/paipu/demo         内置示例解码（无需登录）
+    * POST /api/v1/paipu/simulate     事件流状态机重放（返回快照）
+    * GET  /api/v1/paipu/{uuid}/replay 返回 majiang-ui 回放数据
 
 说明：雀魂阻止程序化登录（151），主路径为通过调试浏览器打开牌谱并
 捕获响应帧；底层协议层保留在 majsoul_ws.py / token_helper.py。
@@ -78,6 +80,11 @@ class PaipuSimulateResponse(BaseModel):
     event_count: int
     snapshot_count: int
     snapshots: list
+
+
+class PaipuReplayResponse(BaseModel):
+    uuid: str
+    paipu: dict                  # majiang-ui 可直接消费的回放数据
 
 
 # ---------------------------------------------------------------------------
@@ -159,16 +166,47 @@ async def browser_fetch_paipu(req: PaipuFetchRequest):
 
 @app.get("/api/v1/paipu/demo")
 def demo_paipu():
-    """演示接口（无需 token / 无需网络）：解码内置真实牌谱样例。
+    """演示接口（无需 token / 无需网络）。
 
-    用于在未配置 access_token 时验证「链接 -> 行为」解码链路。
+    优先返回本地缓存中一份真实牌谱（数据自洽，可直接体验完整回放）；
+    本地无缓存时回退到内置 fixture（仅验证解码链路，配牌与鸣牌可能不自洽）。
     """
     import base64
+    import json
     import sys
     from pathlib import Path
 
     from proto.decoder import decode_paipu
 
+    # 优先：返回本地缓存的一份真实牌谱，保证回放数据自洽
+    cache_dir = settings.record_cache_dir
+    real_records = sorted(
+        (p for p in cache_dir.glob("*.json") if p.stem != "sample"),
+        key=lambda p: p.name,
+    )
+    if real_records:
+        path = real_records[0]
+        data = json.loads(path.read_text(encoding="utf-8"))
+        uuid = data.get("uuid") or path.stem
+        events = [
+            {
+                "step": s["step"],
+                "type": s["event_type"],
+                "full_name": "",
+                "seat": s["event_summary"].get("seat"),
+                "data": dict(s["event_summary"]),
+            }
+            for s in data.get("snapshots", [])
+        ]
+        return PaipuFetchResponse(
+            uuid=uuid,
+            version=0,
+            events=events,
+            event_count=len(events),
+            snapshots=data.get("snapshots", []),
+        )
+
+    # 回退：解码内置 fixture（人工构造的解码样例）
     sys.path.insert(0, str(Path(__file__).resolve().parent / "proto"))
     import protocol_pb2 as pb
 
@@ -183,10 +221,16 @@ def demo_paipu():
     res.ParseFromString(raw)
     result = decode_paipu(res.data)
     from game_state.game_simulator import simulate
+    from game_state.snapshot import save_snapshots
 
-    snapshots = simulate(result.events, head={"uuid": res.head.uuid or "sample"}, strict=False)
+    uuid = res.head.uuid or "sample"
+    snapshots = simulate(result.events, head={"uuid": uuid}, strict=False)
+    try:
+        save_snapshots(uuid, snapshots, settings.record_cache_dir)
+    except Exception as exc:
+        logger.warning("保存演示快照缓存失败（不影响本次结果）: %s", exc)
     return PaipuFetchResponse(
-        uuid=res.head.uuid or "sample",
+        uuid=uuid,
         version=result.version,
         events=[e.to_dict() for e in result.events],
         event_count=len(result.events),
@@ -212,6 +256,79 @@ def simulate_paipu(req: PaipuSimulateRequest):
         snapshot_count=len(snapshots),
         snapshots=[s.model_dump(mode="json") for s in snapshots],
     )
+
+
+@app.get("/api/v1/paipu/{uuid}/replay", response_model=PaipuReplayResponse)
+def replay_paipu(uuid: str):
+    """从快照缓存生成 majiang-ui 回放数据（阶段四）。"""
+    from proto.decoder import GameEvent
+    from replay.adapter import events_to_paipu
+    from game_state.snapshot import load_snapshots
+
+    try:
+        snapshots = load_snapshots(uuid, settings.record_cache_dir)
+    except Exception:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": f"快照缓存不存在: {uuid}，请先通过 browser-fetch 拉取"},
+        )
+
+    events = [
+        GameEvent(
+            step=s.step,
+            type=s.event_type,
+            full_name="",
+            seat=s.event_summary.get("seat"),
+            data=dict(s.event_summary),
+        )
+        for s in snapshots
+    ]
+    try:
+        paipu = events_to_paipu(events, head={"uuid": uuid, "title": uuid}, strict=False)
+    except Exception as exc:
+        logger.warning("生成回放数据失败: %s", exc)
+        return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+    return PaipuReplayResponse(uuid=uuid, paipu=paipu)
+
+
+@app.get("/api/v1/paipu/{uuid}/ai")
+def ai_analyze_paipu(uuid: str):
+    """对已拉取的牌谱运行 Mortal AI 推理，返回逐决策点推荐（阶段五）。"""
+    from proto.decoder import GameEvent
+    from game_state.snapshot import load_snapshots
+    from ai_module.mortal_model_adapter import MortalModelAdapter
+    from ai_module.replay_analyzer import ReplayAnalyzer
+
+    try:
+        snapshots = load_snapshots(uuid, settings.record_cache_dir)
+    except Exception:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": f"快照缓存不存在: {uuid}，请先通过 browser-fetch 拉取"},
+        )
+
+    events = [
+        GameEvent(
+            step=s.step,
+            type=s.event_type,
+            full_name="",
+            seat=s.event_summary.get("seat"),
+            data=dict(s.event_summary),
+        )
+        for s in snapshots
+    ]
+
+    weight_path = settings.weights_dir / "mortal_298k.pth"
+    try:
+        adapter = MortalModelAdapter(weight_path, device="cpu").load()
+        analyzer = ReplayAnalyzer(adapter, player_id=0)
+        result = analyzer.analyze_replay(events, seat=0)
+    except Exception as exc:
+        logger.warning("AI 推理失败: %s", exc)
+        return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+    return result
 
 
 # ---------------------------------------------------------------------------

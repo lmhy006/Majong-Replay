@@ -50,7 +50,26 @@
         padding: 22px 24px;
         margin-bottom: 20px;
     }
-    .card h2 { margin: 0 0 14px; font-size: 16px; color: var(--muted); font-weight: 600; }
+    .card h2 {
+        margin: 0 0 14px;
+        font-size: 16px;
+        color: var(--muted);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    #btn-toggle-events { padding: 5px 14px; font-size: 12px; }
+    #events-scroll { display: none; max-height: 420px; overflow-y: auto; border-radius: 8px; }
+    /* 覆盖 majiang-ui 默认的 #board 隐藏，并让回放桌在页面中居中显示 */
+    #board {
+        display: block;
+        position: relative;
+        width: 800px;
+        margin: 0 auto;
+    }
     .input-row { display: flex; gap: 10px; flex-wrap: wrap; }
     #paipu-url {
         flex: 1 1 360px;
@@ -82,7 +101,7 @@
     .result .row { margin: 4px 0; word-break: break-all; }
     .result .row b { color: var(--muted); font-weight: 600; margin-right: 6px; }
     #events-summary { margin-top: 14px; font-size: 13px; color: var(--muted); }
-    #events-table { display: none; margin-top: 10px; width: 100%; border-collapse: collapse; font-size: 13px; }
+    #events-table { display: table; margin-top: 10px; width: 100%; border-collapse: collapse; font-size: 13px; }
     #events-table th, #events-table td {
         padding: 7px 10px;
         text-align: left;
@@ -121,7 +140,7 @@
 
 <header>
     <h1>🀄 雀魂牌谱本地复盘系统</h1>
-    <span class="badge">阶段二 · 牌谱拉取与解码</span>
+    <span class="badge">阶段四 · majiang-ui 回放对接</span>
 </header>
 
 <main>
@@ -146,26 +165,32 @@
     </section>
 
     <section class="card">
-        <h2>对局行为（事件流解码）</h2>
+        <h2>对局行为（事件流解码）
+            <button id="btn-toggle-events" class="secondary" style="display:none">收起事件流</button>
+        </h2>
         <div id="events-summary">尚未拉取。</div>
-        <table id="events-table">
-            <thead>
-                <tr><th>#</th><th>行为</th><th>座位</th><th>详情</th></tr>
-            </thead>
-            <tbody id="events-body"></tbody>
-        </table>
+        <div id="events-scroll">
+            <table id="events-table">
+                <thead>
+                    <tr><th>#</th><th>行为</th><th>座位</th><th>详情</th></tr>
+                </thead>
+                <tbody id="events-body"></tbody>
+            </table>
+        </div>
     </section>
 
     <section class="card">
         <h2>对局回放</h2>
         <div id="replay-area">
-            majiang-ui 回放区 · 阶段四接入（当前阶段完成事件流解码）
+            拉取或查看示例后，这里会自动加载 majiang-ui 回放
         </div>
     </section>
 </main>
 
 <footer>仅本地运行 · 单条手动解析 · 请求间隔 ≥2s</footer>
 
+<script src="/static/majiang-ui/node_modules/jquery/dist/jquery.min.js"></script>
+<script src="/static/majiang-ui/node_modules/jquery-ui/dist/jquery-ui.min.js"></script>
 <script src="/static/majiang-ui/dist/majiang-ui.js"></script>
 <script>
 "use strict";
@@ -177,8 +202,10 @@ const btnBrowserFetch = document.getElementById("btn-browser-fetch");
 const btnDemo  = document.getElementById("btn-demo");
 const box    = document.getElementById("parse-result");
 const evSummary = document.getElementById("events-summary");
+const evScroll  = document.getElementById("events-scroll");
 const evTable   = document.getElementById("events-table");
 const evBody    = document.getElementById("events-body");
+const btnToggleEvents = document.getElementById("btn-toggle-events");
 
 const SEAT_NAME = ["东", "南", "西", "北"];
 
@@ -234,7 +261,276 @@ function renderEvents(res) {
             `<td class="detail">${describeEvent(e)}</td>`;
         evBody.appendChild(tr);
     }
-    evTable.style.display = "table";
+    evScroll.style.display = "block";
+    evSummary.style.display = "block";
+    btnToggleEvents.style.display = "inline-block";
+    btnToggleEvents.textContent = "收起事件流";
+    loadReplay(res.uuid);
+}
+
+// ---- majiang-ui 回放 ----
+
+function replayTemplate() {
+    const player = name => `
+        <div class="player ${name}"></div>
+        <div class="shoupai ${name}">
+            <div class="bingpai"></div>
+            <div class="fulou"></div>
+        </div>
+        <div class="he ${name}">
+            <div class="lizhi">
+                <img class="chouma hide" src="/static/majiang-ui/dist/img/1000.gif" alt="供托">
+            </div>
+            <div class="dapai"></div>
+        </div>
+        <div class="say ${name}"></div>`;
+    return `
+    <div id="board">
+        <div class="board">
+            <div class="score">
+                <div class="juchang">
+                    <span class="jushu"></span>
+                    <div class="jicun">
+                        <img class="chouma" src="/static/majiang-ui/dist/img/100.gif" alt="本场">
+                        ：<span class="changbang"></span>
+                        <br>
+                        <img class="chouma" src="/static/majiang-ui/dist/img/1000.gif" alt="供托">
+                        ：<span class="lizhibang"></span>
+                    </div>
+                </div>
+                <div class="shan">
+                    <div class="baopai"></div>
+                    <div>牌数：<span class="paishu"></span></div>
+                </div>
+                <div class="defen">
+                    <div class="main"></div>
+                    <div class="xiajia"></div>
+                    <div class="duimian"></div>
+                    <div class="shangjia"></div>
+                </div>
+            </div>
+            <div class="timer hide"></div>
+            <div class="player-button hide"></div>
+            <div class="select-mianzi hide"></div>
+            ${player("main")}
+            ${player("xiajia")}
+            ${player("duimian")}
+            ${player("shangjia")}
+            <div class="hule-dialog hide">
+                <div>
+                    <div>
+                        <div class="hule">
+                            <div class="shan baopai"><span class="baopai"></span></div>
+                            <div class="shan fubaopai"><span class="fubaopai"></span></div>
+                            <div class="shoupai">
+                                <div class="bingpai"></div>
+                                <div class="fulou"></div>
+                            </div>
+                            <table class="hupai">
+                                <tbody>
+                                    <tr class="r_hupai"><td class="name"></td><td class="fanshu"></td></tr>
+                                    <tr class="r_defen"><td class="defen" colspan="2"></td></tr>
+                                </tbody>
+                            </table>
+                            <div class="jicun">
+                                <img class="chouma" src="/static/majiang-ui/dist/img/100.gif" alt="本场">
+                                ：<span class="changbang"></span>
+                                <img class="chouma" src="/static/majiang-ui/dist/img/1000.gif" alt="供托">
+                                ：<span class="lizhibang"></span>
+                            </div>
+                        </div>
+                        <div class="pingju"></div>
+                        <div class="fenpei fenpai">
+                            <div class="main"><span class="feng"></span>：<span class="player"></span><span class="defen"></span><span class="diff"></span></div>
+                            <div class="xiajia"><span class="feng"></span>：<span class="player"></span><span class="defen"></span><span class="diff"></span></div>
+                            <div class="duimian"><span class="feng"></span>：<span class="player"></span><span class="defen"></span><span class="diff"></span></div>
+                            <div class="shangjia"><span class="feng"></span>：<span class="player"></span><span class="defen"></span><span class="diff"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="summary">
+                <div>
+                    <div>
+                        <table>
+                            <thead>
+                                <tr class="r_player">
+                                    <td colspan="3"></td>
+                                    <th class="player"></th>
+                                    <th class="player"></th>
+                                    <th class="player"></th>
+                                    <th class="player"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="body">
+                                <tr class="r_diff">
+                                    <th class="jushu"></th>
+                                    <th class="changbang"></th>
+                                    <th class="last"></th>
+                                    <td class="back"><span class="diff"></span><span class="lizhi"></span></td>
+                                    <td class="back"><span class="diff"></span><span class="lizhi"></span></td>
+                                    <td class="back"><span class="diff"></span><span class="lizhi"></span></td>
+                                    <td class="back"><span class="diff"></span><span class="lizhi"></span></td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="r_defen">
+                                    <td colspan="3"></td>
+                                    <td class="defen"></td>
+                                    <td class="defen"></td>
+                                    <td class="defen"></td>
+                                    <td class="defen"></td>
+                                </tr>
+                                <tr class="r_point">
+                                    <td colspan="3"></td>
+                                    <td class="point"></td>
+                                    <td class="point"></td>
+                                    <td class="point"></td>
+                                    <td class="point"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="kaiju">
+                <div>
+                    <div class="title"></div>
+                    <div class="player">
+                        <div class="main"></div>
+                        <div class="xiajia"></div>
+                        <div class="duimian"></div>
+                        <div class="shangjia"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="suspend hide"></div>
+            <div class="tenhou-dialog" style="display:none">
+                <form>
+                    <label><input type="radio" name="type" value="URL" checked> URL</label>
+                    <label><input type="radio" name="type" value="JSON"> JSON</label>
+                    <label><input type="checkbox" name="limited" checked> 限定当前局</label>
+                    <textarea></textarea>
+                    <button type="submit">复制</button>
+                </form>
+            </div>
+        </div>
+        <div class="controller">
+            <img class="exit" src="/static/majiang-ui/dist/img/icon-exit.png" title="終了 [q]">
+            <img class="summary" src="/static/majiang-ui/dist/img/icon-list.png" title="集計表示 [?]">
+            <img class="sound on" src="/static/majiang-ui/dist/img/icon-volume-up.png" title="音声OFF [a]">
+            <img class="sound off" src="/static/majiang-ui/dist/img/icon-mutealt.png" title="音声ON [a]">
+            <img class="analyzer" src="/static/majiang-ui/dist/img/icon-lightbulb-idea.png" title="検討ON/OFF [i]">
+            <img class="export" src="/static/majiang-ui/dist/img/icon-export.png" title="天鳳牌譜 [t]">
+            <div></div>
+            <img class="first" src="/static/majiang-ui/dist/img/icon-step-backward.png" title="配牌/前局 [←]">
+            <img class="prev" src="/static/majiang-ui/dist/img/icon-backward.png" title="戻る [↑]">
+            <img class="play on" src="/static/majiang-ui/dist/img/icon-play.png" title="再開 [space]">
+            <img class="play off" src="/static/majiang-ui/dist/img/icon-pause.png" title="停止 [space]">
+            <img class="next" src="/static/majiang-ui/dist/img/icon-forward.png" title="進む [↓]">
+            <img class="last" src="/static/majiang-ui/dist/img/icon-step-forward.png" title="結果/次局 [→]">
+            <div class="speed">
+                <img class="minus" src="/static/majiang-ui/dist/img/icon-minus-sign.png" title="速度- [-]">
+                <span></span><span></span><span></span><span></span><span></span>
+                <img class="plus" src="/static/majiang-ui/dist/img/icon-plus-sign.png" title="速度+ [+]">
+            </div>
+        </div>
+    </div>`;
+}
+
+let replayView = null;
+
+function renderReplay(paipu) {
+    const area = document.getElementById("replay-area");
+    area.innerHTML = replayTemplate();
+    const root = document.getElementById("board");
+
+    // 牌模板容器：majiang-ui 的 pai() 需要从 .pai 元素建立牌面映射
+    const paiBox = document.createElement("div");
+    paiBox.id = "pai";
+    paiBox.style.display = "none";
+    for (const s of ["m", "p", "s"]) {
+        for (let n = 0; n <= 9; n++) {
+            const img = document.createElement("img");
+            img.className = "pai";
+            img.dataset.pai = s + n;
+            img.src = `/static/majiang-ui/dist/img/${s}${n}.gif`;
+            paiBox.appendChild(img);
+        }
+    }
+    for (let n = 1; n <= 7; n++) {
+        const img = document.createElement("img");
+        img.className = "pai";
+        img.dataset.pai = "z" + n;
+        img.src = `/static/majiang-ui/dist/img/z${n}.gif`;
+        paiBox.appendChild(img);
+    }
+    root.appendChild(paiBox);
+
+    // 音频模板容器：majiang-ui 的 audio() 需要从 <audio data-name> 建立音效映射
+    const audioBox = document.createElement("div");
+    audioBox.id = "audio";
+    audioBox.style.display = "none";
+    const audioMap = {
+        dapai: "dahai11.wav", chi: "chii.wav", peng: "pon.wav",
+        gang: "kan.wav", rong: "ron.wav", zimo: "tsumo.wav",
+        lizhi: "richi.wav", gong: "beep.wav",
+    };
+    for (const [name, file] of Object.entries(audioMap)) {
+        const a = document.createElement("audio");
+        a.dataset.name = name;
+        a.src = `/static/majiang-ui/dist/audio/${file}`;
+        audioBox.appendChild(a);
+    }
+    root.appendChild(audioBox);
+
+    // 直接按牌名生成牌面/音效，避免依赖 #pai/#audio 容器的动态映射
+    const pai = function(p) {
+        let key = p.slice(0, 2);
+        // 兼容雀魂格式 "2m" 与 majiang-ui 格式 "m2"
+        if (/^[0-9]/.test(key)) key = key[1] + key[0];
+        // 牌背 "_"：使用牌背图
+        if (key === "_") {
+            return $("<img>")
+                .attr("class", "pai")
+                .attr("data-pai", "_")
+                .attr("src", "/static/majiang-ui/dist/img/pai.gif");
+        }
+        return $("<img>")
+            .attr("class", "pai")
+            .attr("data-pai", key)
+            .attr("src", `/static/majiang-ui/dist/img/${key}.gif`);
+    };
+    const audio = function(name) {
+        const file = audioMap[name] || "beep.wav";
+        return new Audio(`/static/majiang-ui/dist/audio/${file}`);
+    };
+    // analyzer 最小桩：页面暂未接入 AI 复盘面板，但避免点击 i 按钮时报错
+    const analyzerStub = {
+        active() {}, clear() {}, close() {}, next() {}, action() {}, id() {},
+    };
+    // Paipu 的 root 需要是 jQuery 对象（内部使用 .on/.off 等 jQuery 方法）
+    replayView = new Majiang.UI.Paipu(
+        $(root), paipu, pai, audio, "paipu-pref", () => {}, () => analyzerStub
+    );
+    // 直接定位到第一局起始，避免默认显示空白 kaiju 界面
+    replayView.start(0, 0, 0);
+}
+
+async function loadReplay(uuid) {
+    const area = document.getElementById("replay-area");
+    area.innerHTML = '<div style="color:var(--muted)">正在加载回放数据…</div>';
+    try {
+        const res = await fetch(`/api/v1/paipu/${encodeURIComponent(uuid)}/replay`);
+        const data = await res.json();
+        if (!res.ok) {
+            area.innerHTML = `<div style="color:var(--err)">回放数据加载失败：${data.detail || res.status}</div>`;
+            return;
+        }
+        renderReplay(data.paipu);
+    } catch (e) {
+        area.innerHTML = `<div style="color:var(--err)">回放加载异常：${e}</div>`;
+    }
 }
 
 // ---- 交互 ----
@@ -340,6 +636,20 @@ btnDemo.addEventListener("click", async () => {
         showResult(false, [["错误", String(e)]]);
     } finally {
         setBusy(false);
+    }
+});
+
+btnToggleEvents.addEventListener("click", () => {
+    const collapsed = evScroll.style.display === "none";
+    if (collapsed) {
+        evScroll.style.display = "block";
+        evSummary.style.display = "block";
+        btnToggleEvents.textContent = "收起事件流";
+    } else {
+        evScroll.style.display = "none";
+        evSummary.style.display = "none";
+        btnToggleEvents.textContent = "展开事件流";
+        document.getElementById("replay-area").scrollIntoView({ behavior: "smooth", block: "start" });
     }
 });
 
